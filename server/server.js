@@ -1,6 +1,5 @@
 const mongoose = require('mongoose')
 const express = require('express')
-const axios = require('axios')
 const cors = require('cors')
 const app = express()
 
@@ -23,111 +22,132 @@ mongoose.connect("mongodb://localhost:27017/my-db", {
 
 const StoreModel = mongoose.model('StoreModel', new mongoose.Schema({
     id: String,
-    info: Object
+    name: String,
+    status: String,
+    contra: String,
+    jugada: String,
+    res: String,
 }));
 
-function saveMongo(id, info) {
-    const newRecord = new StoreModel({ id: id, info: info });
+function saveMongo({ name, status }) {
+    const id = name.replace(/\s+/g, '')
+    const newRecord = new StoreModel({ id: id, name: name, status: status });
     newRecord.save(function (err) {
         if (err) return handleError(err);
     });
+    return id
 }
 
-async function updateMongo(id, info) {
+async function checkState(id) {
     actual = await findMongo(id)
-    StoreModel.updateOne({ id: id }, { info: { ...actual[0].info, ...info } }, function (err,) {
-        if (err) return handleError(err);
-    })
+    if (actual[0].status == "w") {
+        waiting = await findWaiting()
+        console.log(waiting)
+        if (waiting.length > 1) {
+            StoreModel.updateOne({ id: waiting[0].id }, { status: "p", contra: waiting[1].id, jugada: "" }, function (err,) {
+                if (err) return handleError(err);
+            })
+            StoreModel.updateOne({ id: waiting[1].id }, { status: "p", contra: waiting[0].id, jugada: "" }, function (err,) {
+                if (err) return handleError(err);
+            })
+        }
+    } if (actual[0].status == "p") {
+        const jugada_actual = actual[0].jugada
+        if (jugada_actual) {
+            contrario = await findMongo(actual[0].contra)
+            const jugada_contrario = contrario[0].jugada
+            if (jugada_contrario) {
+                if (jugada_contrario == jugada_actual) {
+                    StoreModel.updateOne({ id: actual[0].id }, { res: "e", jugada: "" }, function (err,) {
+                        if (err) return handleError(err);
+                    })
+                    StoreModel.updateOne({ id: contrario[0].id }, { res: "e", jugada: "" }, function (err,) {
+                        if (err) return handleError(err);
+                    })
+                } else {
+                    if ((jugada_actual == "s" && jugada_contrario == "p") || (jugada_actual == "p" && jugada_contrario == "t")) {
+                        StoreModel.updateOne({ id: actual[0].id }, { res: "l", jugada: "" }, function (err,) {
+                            if (err) return handleError(err);
+                        })
+                        StoreModel.updateOne({ id: contrario[0].id }, { res: "g", jugada: "" }, function (err,) {
+                            if (err) return handleError(err);
+                        })
+                    } else {
+                        StoreModel.updateOne({ id: actual[0].id }, { res: "g", jugada: "" }, function (err,) {
+                            if (err) return handleError(err);
+                        })
+                        StoreModel.updateOne({ id: contrario[0].id }, { res: "l", jugada: "" }, function (err,) {
+                            if (err) return handleError(err);
+                        })
+                    }
+
+                }
+            }
+        }
+        console.log(actual[0].name + " esperando")
+    }
+    return await findMongo(id)
 }
 
-function deleteMongo(id) {
-    StoreModel.deleteMany({ id: id }, function (err) {
-        if (err) return handleError(err);
-    })
-}
 
-async function findAllMongo() {
-    return StoreModel.find(function (err, docs) {
-        if (err) return handleError(err);
-        return docs.map(x => x.info)
-    })
-}
-
-async function findMongo(id) {
-    return StoreModel.find({ id: id }, 'id info', function (err, doc) {
+async function findMongo(id2) {
+    return StoreModel.find({ id: id2 }, 'id name status contra jugada res', function (err, doc) {
         if (err) return handleError(err);
         return doc[0]
     })
 }
 
-app.get('/get/:id', async (req, res) => {
-    let id = 0;
-    id = parseInt(req.params.id);
-    info = await findMongo(id)
+async function findWaiting() {
+    return StoreModel.find({ status: "w" }, 'id name status', function (err, docs) {
+        if (err) return handleError(err);
+        return docs
+    })
+}
 
-    if (info.length) {
-        console.log("Info is in cache.")
-        info = info[0].info
-    } else {
-        console.log("Info is not in cache. Asking pokeapi...")
+function deleteMongo() {
+    StoreModel.deleteMany({}, function (err) {
+        if (err) return handleError(err);
+    })
+}
 
-        await axios.get(`https://pokeapi.co/api/v2/pokemon/${id}`)
-            .then(({ data }) => {
-                saveMongo(data.id, data);
-                info = data
-            })
-            .catch((err) => {
-                console.error(err.response)
-                return res.sendStatus(err.response.status)
-            })
-    }
+function jugada(id, jug) {
+    StoreModel.updateOne({ id: id }, { jugada: jug }, function (err,) {
+        if (err) return handleError(err);
+    })
+}
+
+
+app.post('/play', async (req, res) => {
+    console.log("Saving... ")
+    const id = saveMongo(req.body);
+
+    res.send(await checkState(id))
+    console.log("completed.")
+})
+
+
+app.post('/status/:id', async (req, res) => {
+    id = req.params.id;
+    info = await checkState(id)
+
     res.send(info)
     console.log("Sent.")
 })
 
-app.get('/getAll', async (req, res) => {
-    console.log("Sending all... ")
-    res.send(await findAllMongo())
-    console.log("completed.")
+app.post('/jug/:text', async (req, res) => {
+    arr = req.params.text.split('-');
+    info = await jugada(arr[0], arr[1])
+
+    res.send()
+    console.log("get.")
 })
 
-app.post('/create', async (req, res) => {
-    console.log("Saving... ")
-    const { id, ...info } = req.body;
-    saveMongo(id, info);
-    res.send(info)
-    console.log("completed.")
+app.get('/delete', async (req, res) => {
+    deleteMongo()
+    res.send()
+    console.log("Deleted.")
 })
 
-app.put('/update/:id', async (req, res) => {
-    id = parseInt(req.params.id);
-    info = await findMongo(id)
-
-    if (info.length) {
-        console.log("Updating... ")
-        updateMongo(id, req.body)
-        res.send()
-        console.log("completed.")
-    } else {
-        console.error("Info is NOT in cache.")
-        res.status(400).send()
-    }
-})
-
-app.delete('/delete/:id', async (req, res) => {
-    id = parseInt(req.params.id);
-    info = await findMongo(id)
-
-    if (info.length) {
-        console.log("Info is in cache... ")
-        deleteMongo(id)
-        res.send()
-        console.log("deleted.")
-    } else {
-        console.error("Info is NOT in cache.")
-        res.send()
-    }
-})
 
 app.listen(PORT, () => {
     console.log(`Server listening at http://localhost:${PORT}`)
