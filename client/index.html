@@ -10,6 +10,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", (_) => {
             document.getElementById("play").addEventListener("click", startPlay(get_element_li));
+            document.getElementById("otro").addEventListener("click", update_element_event("r"))
         });
     </script>
     <style>
@@ -32,6 +33,15 @@
 
     </ul>
     <div id="error"></div>
+    <br>
+    <br>
+    <br>
+    <br>
+    <div>Ganados: <span id="cg">0</span></div>
+    <div>Empate: <span id="ce">0</span></div>
+    <div>Perdidos: <span id="cl">0</span></div>
+    <br>
+    <div><button id="otro" disabled="true">otro</button></div>
 </body>
 
 </html>

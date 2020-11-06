@@ -40,9 +40,10 @@ function saveMongo({ name, status }) {
 
 async function checkState(id) {
     actual = await findMongo(id)
+    // console.log(actual)
     if (actual[0].status == "w") {
         waiting = await findWaiting()
-        console.log(waiting)
+        // console.log(waiting)
         if (waiting.length > 1) {
             StoreModel.updateOne({ id: waiting[0].id }, { status: "p", contra: waiting[1].id, jugada: "" }, function (err,) {
                 if (err) return handleError(err);
@@ -58,25 +59,25 @@ async function checkState(id) {
             const jugada_contrario = contrario[0].jugada
             if (jugada_contrario) {
                 if (jugada_contrario == jugada_actual) {
-                    StoreModel.updateOne({ id: actual[0].id }, { res: "e", jugada: "" }, function (err,) {
+                    StoreModel.updateOne({ id: actual[0].id }, {status: "f",  res: "e", jugada: "" }, function (err,) {
                         if (err) return handleError(err);
                     })
-                    StoreModel.updateOne({ id: contrario[0].id }, { res: "e", jugada: "" }, function (err,) {
+                    StoreModel.updateOne({ id: contrario[0].id }, {status: "f",  res: "e", jugada: "" }, function (err,) {
                         if (err) return handleError(err);
                     })
                 } else {
-                    if ((jugada_actual == "s" && jugada_contrario == "p") || (jugada_actual == "p" && jugada_contrario == "t")) {
-                        StoreModel.updateOne({ id: actual[0].id }, { res: "l", jugada: "" }, function (err,) {
+                    if ((jugada_actual == "s" && jugada_contrario == "p") || (jugada_actual == "p" && jugada_contrario == "t") || (jugada_actual == "t" && jugada_contrario == "s")) {
+                        StoreModel.updateOne({ id: actual[0].id }, {status: "f",  res: "l", jugada: "" }, function (err,) {
                             if (err) return handleError(err);
                         })
-                        StoreModel.updateOne({ id: contrario[0].id }, { res: "g", jugada: "" }, function (err,) {
+                        StoreModel.updateOne({ id: contrario[0].id }, {status: "f",  res: "g", jugada: "" }, function (err,) {
                             if (err) return handleError(err);
                         })
                     } else {
-                        StoreModel.updateOne({ id: actual[0].id }, { res: "g", jugada: "" }, function (err,) {
+                        StoreModel.updateOne({ id: actual[0].id }, {status: "f",  res: "g", jugada: "" }, function (err,) {
                             if (err) return handleError(err);
                         })
-                        StoreModel.updateOne({ id: contrario[0].id }, { res: "l", jugada: "" }, function (err,) {
+                        StoreModel.updateOne({ id: contrario[0].id }, {status: "f",  res: "l", jugada: "" }, function (err,) {
                             if (err) return handleError(err);
                         })
                     }
@@ -116,12 +117,18 @@ function jugada(id, jug) {
     })
 }
 
+function restart(id, jug) {
+    StoreModel.updateOne({ id: id }, { status: "w", res: "", jugada: "" }, function (err,) {
+        if (err) return handleError(err);
+    })
+}
+
 
 app.post('/play', async (req, res) => {
     console.log("Saving... ")
     const id = saveMongo(req.body);
 
-    res.send(await checkState(id))
+    res.send({id: id})
     console.log("completed.")
 })
 
@@ -136,7 +143,12 @@ app.post('/status/:id', async (req, res) => {
 
 app.post('/jug/:text', async (req, res) => {
     arr = req.params.text.split('-');
-    info = await jugada(arr[0], arr[1])
+
+    if(arr[1] == "r") {
+        info = await restart(arr[0])
+    } else {
+        info = await jugada(arr[0], arr[1])
+    }
 
     res.send()
     console.log("get.")
