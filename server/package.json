@@ -1,0 +1,23 @@
+{
+  "name": "web-development-first-partial",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netocervantes98/Web-Development-First-partial.git"
+  },
+  "author": "Ernesto Cervantes Juarez",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/netocervantes98/Web-Development-First-partial/issues"
+  },
+  "homepage": "https://github.com/netocervantes98/Web-Development-First-partial#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
